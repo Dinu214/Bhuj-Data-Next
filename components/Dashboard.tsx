@@ -260,7 +260,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
           <span className="text-[11px] font-bold text-ink-muted">GROUPS</span>
         </button>
 
-        {/* Total records tile */}
+        {/* Last Attendance tile (-1 from current) */}
         <button
           onClick={() => (canViewReports() || canViewAttendance()) && onViewChange('attendance-report')}
           disabled={!canViewReports() && !canViewAttendance()}
@@ -269,12 +269,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
           <div className="flex items-center justify-between mb-2">
             <div className="item-badge w-8 h-8 rounded-[10px]" style={{ background: '#F4DEDA' }}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#C1544A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="4" y="5" width="16" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M4 10h16"/>
+                <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
               </svg>
             </div>
+            {attStats?.lastAttendance && (
+              <span className="badge text-[10px]" style={{ background: '#F4DEDA', color: '#C1544A' }}>
+                {new Date(attStats.lastAttendance.attendance_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
           </div>
-          <b className="font-display font-semibold text-ink block" style={{ fontSize: 23 }}>{attStats?.totalRecords?.toLocaleString() ?? '—'}</b>
-          <span className="text-[11px] font-bold text-ink-muted">ATT. RECORDS</span>
+          <b className="font-display font-semibold text-ink block" style={{ fontSize: 23 }}>
+            {attStats?.lastAttendance ? `${attStats.lastAttendance.present}` : '—'}
+          </b>
+          <span className="text-[11px] font-bold text-ink-muted block">LAST ATTENDANCE</span>
+          {attStats?.lastAttendance && (
+            <p className="text-[10px] text-ink-muted font-medium truncate mt-0.5">
+              {attStats.lastAttendance.occasion_name} · {attStats.lastAttendance.rate}% turnout
+            </p>
+          )}
         </button>
       </div>
 

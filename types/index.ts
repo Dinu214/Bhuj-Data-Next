@@ -91,6 +91,13 @@ export interface AttendanceStats {
   todayRate: number;
   byGroup: { group_id: number; group_name: string; present: number; total: number; rate: number }[];
   history?: { attendance_date: string; present: number; total: number; rate: number }[];
+  lastAttendance?: {
+    attendance_date: string;
+    occasion_name: string;
+    present: number;
+    total: number;
+    rate: number;
+  } | null;
 }
 
 // ─── Extended UI Types ────────────────────────────────────────────────────────
