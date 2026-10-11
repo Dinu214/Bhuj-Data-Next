@@ -18,15 +18,18 @@ import OccasionsView from '@/components/OccasionsView';
 import UsersView from '@/components/UsersView';
 import QuickMenuSheet from '@/components/QuickMenuSheet';
 import BirthdaySheet from '@/components/BirthdaySheet';
+import SettingsView from '@/components/SettingsView';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { ViewType } from '@/types';
 import { Loader2 } from 'lucide-react';
+import { useAppSettings } from '@/hooks/useAppSettings';
 
 const STORAGE_VIEW_KEY = 'app_current_view';
 const STORAGE_ID_KEY   = 'app_selected_id';
 
 const AppContent: React.FC = () => {
   const { peopleWithDetails } = useData();
+  const { settings } = useAppSettings();
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -54,10 +57,12 @@ const AppContent: React.FC = () => {
     }
   }, [selectedId, mounted]);
 
-  const upcomingBirthdaysCount = useMemo(() => {
+  const upcomingCelebrationsCount = useMemo(() => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return peopleWithDetails.filter(p => {
+    const windowDays = settings.birthdayWindowDays || 7;
+
+    let total = peopleWithDetails.filter(p => {
       if (!p.dob) return false;
       const parts = p.dob.split('T')[0].split('-');
       if (parts.length < 3) return false;
@@ -66,9 +71,25 @@ const AppContent: React.FC = () => {
       let nextB = new Date(today.getFullYear(), bm, bd);
       if (nextB < today) nextB = new Date(today.getFullYear() + 1, bm, bd);
       const diff = Math.round((nextB.getTime() - today.getTime()) / 86400000);
-      return diff >= 0 && diff <= 7;
+      return diff >= 0 && diff <= windowDays;
     }).length;
-  }, [peopleWithDetails]);
+
+    if (settings.trackAnniversaries) {
+      total += peopleWithDetails.filter(p => {
+        if (p.marital_status !== 'married' || !p.anniversary_date) return false;
+        const parts = p.anniversary_date.split('T')[0].split('-');
+        if (parts.length < 3) return false;
+        const am = parseInt(parts[1], 10) - 1;
+        const ad = parseInt(parts[2], 10);
+        let nextA = new Date(today.getFullYear(), am, ad);
+        if (nextA < today) nextA = new Date(today.getFullYear() + 1, am, ad);
+        const diff = Math.round((nextA.getTime() - today.getTime()) / 86400000);
+        return diff >= 0 && diff <= windowDays;
+      }).length;
+    }
+
+    return total;
+  }, [peopleWithDetails, settings.birthdayWindowDays, settings.trackAnniversaries]);
 
   const {
     user,
@@ -86,7 +107,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'radial-gradient(1200px 650px at 50% -12%, #F1EAE0 0%, #E4DACD 55%, #D8CBBA 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-maroon" />
           <p className="text-xs font-semibold text-ink-muted tracking-wide">Loading Hari Prabodham…</p>
@@ -121,17 +142,18 @@ const AppContent: React.FC = () => {
       case 'attendance-report':return canViewReports() ? <AttendanceReport onViewChange={handleViewChange} /> : <Dashboard onViewChange={handleViewChange} onOpenBirthdays={() => setBirthdayOpen(true)} />;
       case 'occasions':        return canViewOccasions() ? <OccasionsView /> : <Dashboard onViewChange={handleViewChange} onOpenBirthdays={() => setBirthdayOpen(true)} />;
       case 'users':            return canManageUsers() ? <UsersView /> : <Dashboard onViewChange={handleViewChange} onOpenBirthdays={() => setBirthdayOpen(true)} />;
+      case 'settings':         return <SettingsView onViewChange={handleViewChange} />;
       default:                 return <Dashboard onViewChange={handleViewChange} onOpenBirthdays={() => setBirthdayOpen(true)} />;
     }
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'radial-gradient(1200px 650px at 50% -12%, #F1EAE0 0%, #E4DACD 55%, #D8CBBA 100%)' }}>
+    <div className="min-h-screen">
       <AppBar
         currentView={currentView}
         onMenuOpen={() => setMenuOpen(true)}
         onViewChange={handleViewChange}
-        birthdayCount={upcomingBirthdaysCount}
+        birthdayCount={upcomingCelebrationsCount}
         onOpenBirthdays={() => setBirthdayOpen(true)}
       />
 

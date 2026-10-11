@@ -9,6 +9,7 @@ import { useData } from '@/context/DataContext';
 import { useAuth } from '@/hooks/useAuth';
 import { PersonWithDetails } from '@/types';
 import { exportToExcel } from '@/utils/export';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import SelectSheet from './SelectSheet';
 
 interface PeopleViewProps {
@@ -115,11 +116,14 @@ const ContactModal: React.FC<{
 const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId, filterGroupId }) => {
   const { peopleWithDetails, categories, groups, deletePerson } = useData();
   const { canManageGroup, isAdmin, isViewerAdmin, canEditPeople } = useAuth();
+  const { settings } = useAppSettings();
+
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<keyof PersonWithDetails>('full_name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterGroup, setFilterGroup] = useState('');
+  const [filterAmbrish, setFilterAmbrish] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [contactConfirm, setContactConfirm] = useState<{ type: 'call' | 'whatsapp'; name: string; phone: string } | null>(null);
@@ -138,6 +142,10 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
     }
   }, [filterGroupId, groups]);
 
+  const ambrishCount = useMemo(() => {
+    return peopleWithDetails.filter(p => Boolean(p.is_ambrish)).length;
+  }, [peopleWithDetails]);
+
   const filtered = useMemo(() => {
     let list = peopleWithDetails.filter(p =>
       (p.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -146,6 +154,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
     );
     if (filterCategory) list = list.filter(p => p.category?.category_name === filterCategory);
     if (filterGroup) list = list.filter(p => p.groups?.some(g => g.group_name === filterGroup));
+    if (filterAmbrish) list = list.filter(p => Boolean(p.is_ambrish));
 
     list.sort((a, b) => {
       let av: any = a[sortBy] ?? '';
@@ -157,7 +166,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
       return 0;
     });
     return list;
-  }, [peopleWithDetails, search, sortBy, sortOrder, filterCategory, filterGroup]);
+  }, [peopleWithDetails, search, sortBy, sortOrder, filterCategory, filterGroup, filterAmbrish]);
 
   const handleSort = (field: keyof PersonWithDetails) => {
     if (sortBy === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
@@ -207,9 +216,24 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold text-ink-muted">
-          Showing {filtered.length} of {peopleWithDetails.length}
-        </span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-bold text-ink-muted">
+            Showing {filtered.length} of {peopleWithDetails.length}
+          </span>
+          {filterAmbrish && (
+            <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1 shadow-sm">
+              <span>★ Ambrish Only</span>
+              <button
+                type="button"
+                onClick={() => setFilterAmbrish(false)}
+                className="w-3.5 h-3.5 rounded-full hover:bg-amber-200 flex items-center justify-center font-black ml-0.5"
+                title="Remove Ambrish filter"
+              >
+                ×
+              </button>
+            </span>
+          )}
+        </div>
 
         <div className="flex items-center gap-2">
           {canExport && (
@@ -281,33 +305,81 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
-          <button
-            onClick={() => { setFilterCategory(''); setFilterGroup(''); }}
-            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-              !filterCategory && !filterGroup
-                ? 'bg-marigold text-maroon shadow-sm'
-                : 'bg-paper text-ink-soft hover:bg-surface-soft border border-surface-line'
-            }`}
-          >
-            All
-          </button>
-          {categories.map(c => {
-            const active = filterCategory === c.category_name;
-            return (
-              <button
-                key={c.category_id}
-                onClick={() => setFilterCategory(prev => prev === c.category_name ? '' : c.category_name)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  active
-                    ? 'bg-marigold text-maroon shadow-sm'
-                    : 'bg-paper text-ink-soft hover:bg-surface-soft border border-surface-line'
-                }`}
-              >
-                {c.category_name}
-              </button>
-            );
-          })}
+        {/* Ambrish Selection: Dedicated Radio Field */}
+        <div className="flex items-center gap-3 pt-2 pb-0.5 border-t border-surface-soft/80 flex-wrap">
+          <span className="text-[11px] font-bold text-ink-muted uppercase tracking-wider flex-shrink-0">
+            Ambrish:
+          </span>
+          <div className="inline-flex p-0.5 bg-paper rounded-xl border border-surface-line text-xs font-semibold gap-1">
+            <button
+              type="button"
+              onClick={() => setFilterAmbrish(false)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all ${
+                !filterAmbrish ? 'bg-white text-maroon font-bold shadow-sm' : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                !filterAmbrish ? 'border-maroon bg-white' : 'border-surface-line'
+              }`}>
+                {!filterAmbrish && <span className="w-1.5 h-1.5 rounded-full bg-maroon" />}
+              </span>
+              <span>All Members</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilterAmbrish(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition-all ${
+                filterAmbrish ? 'bg-white text-amber-700 font-bold shadow-sm' : 'text-ink-muted hover:text-ink'
+              }`}
+            >
+              <span className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                filterAmbrish ? 'border-amber-600 bg-white' : 'border-surface-line'
+              }`}>
+                {filterAmbrish && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />}
+              </span>
+              <span className="flex items-center gap-1">
+                <span>★ Ambrish Only</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterAmbrish ? 'bg-amber-100 text-amber-800' : 'bg-surface-soft text-ink-muted'
+                }`}>
+                  {ambrishCount}
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Category Selection: Spacious with extra height above scroll track */}
+        <div className="pt-1.5 pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-3 scrollbar-thin text-xs">
+            <button
+              onClick={() => setFilterCategory('')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+                !filterCategory
+                  ? 'bg-marigold text-maroon shadow-sm'
+                  : 'bg-paper text-ink-soft hover:bg-surface-soft border border-surface-line'
+              }`}
+            >
+              All
+            </button>
+            {categories.map(c => {
+              const active = filterCategory === c.category_name;
+              return (
+                <button
+                  key={c.category_id}
+                  onClick={() => setFilterCategory(prev => prev === c.category_name ? '' : c.category_name)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex-shrink-0 ${
+                    active
+                      ? 'bg-marigold text-maroon shadow-sm'
+                      : 'bg-paper text-ink-soft hover:bg-surface-soft border border-surface-line'
+                  }`}
+                >
+                  {c.category_name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -358,6 +430,22 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                    {person.is_ambrish && (
+                      <span
+                        className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80 flex items-center gap-1"
+                        title="Ambrish Member"
+                      >
+                        ★ Ambrish
+                      </span>
+                    )}
+                    {person.marital_status === 'married' && (
+                      <span
+                        className="px-2 py-0.5 rounded-lg text-[10.5px] font-semibold bg-rose-50 text-rose-800 border border-rose-200/60 flex items-center gap-1"
+                        title={person.anniversary_date ? `Anniversary: ${new Date(person.anniversary_date).toLocaleDateString('en-IN')}` : 'Married'}
+                      >
+                        💍 Married{person.anniversary_date ? ` · ${new Date(person.anniversary_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                      </span>
+                    )}
                     {person.category && (
                       <span
                         className="px-2.5 py-0.5 rounded-lg text-[10.5px] font-bold"
@@ -414,7 +502,7 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
                     className="text-xs font-bold text-ink-soft hover:text-maroon flex items-center gap-1 transition-colors ml-auto"
                   >
                     <span>Profile</span>
-                    <ArrowRight className="w-3 h-3" />
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -444,12 +532,29 @@ const PeopleView: React.FC<PeopleViewProps> = ({ onViewChange, filterCategoryId,
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2.5">
                           <Avatar name={person.full_name} photo={person.photo_url} size="sm" />
-                          <button
-                            onClick={() => onViewChange('person-detail', person.person_id)}
-                            className="font-bold text-ink hover:text-maroon transition-colors text-left"
-                          >
-                            {person.full_name}
-                          </button>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                onClick={() => onViewChange('person-detail', person.person_id)}
+                                className="font-bold text-ink hover:text-maroon transition-colors text-left"
+                              >
+                                {person.full_name}
+                              </button>
+                              {person.is_ambrish && (
+                                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80">
+                                  ★ Ambrish
+                                </span>
+                              )}
+                              {person.marital_status === 'married' && (
+                                <span
+                                  className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-rose-50 text-rose-800 border border-rose-200/60"
+                                  title={person.anniversary_date ? `Anniversary: ${new Date(person.anniversary_date).toLocaleDateString('en-IN')}` : 'Married'}
+                                >
+                                  💍 {person.anniversary_date ? new Date(person.anniversary_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Married'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-ink-muted font-medium">

@@ -17,9 +17,11 @@ interface AppBarProps {
 const AppBar: React.FC<AppBarProps> = ({ onMenuOpen, onViewChange, birthdayCount = 0, onOpenBirthdays }) => {
   const { user } = useAuth();
   const initials = (user?.displayName || user?.username || 'U').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
-
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3" style={{ background: '#EFE7DB' }}>
+    <header
+      className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 border-b border-[#CFBFAD]/70 backdrop-blur-sm"
+      style={{ background: '#DECEBB', boxShadow: '0 2px 6px -1px rgba(33,21,38,.06)' }}
+    >
       {/* Menu */}
       <button onClick={onMenuOpen} className="roundbtn">
         <Menu className="w-4 h-4" />

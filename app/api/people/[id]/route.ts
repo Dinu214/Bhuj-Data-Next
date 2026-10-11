@@ -30,6 +30,9 @@ export const PUT = withAuth(async (req: NextRequest, user: JwtPayload, ctx) => {
     }
     const p = current.rows[0];
 
+    const maritalStatus = cleanEnum(body.marital_status, ['single','married','widowed']);
+    const anniversaryDate = maritalStatus === 'married' ? cleanDate(body.anniversary_date) : null;
+
     const result = await client.query(
       `UPDATE people SET
         full_name=$1, mobile_number=$2, dob=$3, category_id=$4, photo_url=$5,
@@ -45,8 +48,8 @@ export const PUT = withAuth(async (req: NextRequest, user: JwtPayload, ctx) => {
         cleanStr(body.photo_url), cleanStr(body.address), cleanStr(body.mobile_number_2),
         cleanStr(body.email), cleanStr(body.blood_group), Boolean(body.is_ambrish),
         cleanDate(body.dixa_date), cleanStr(body.avd_code), cleanStr(body.aadhar_card_no),
-        cleanEnum(body.marital_status, ['single','married','widowed']),
-        cleanDate(body.anniversary_date), cleanStr(body.attended_mahotsav),
+        maritalStatus,
+        anniversaryDate, cleanStr(body.attended_mahotsav),
         cleanStr(body.education_qualification), cleanStr(body.running_education),
         cleanEnum(body.occupation, ['job','business','student','other']),
         cleanStr(body.job_business_details), cleanStr(body.reference_person),

@@ -174,10 +174,12 @@ const PersonDetail: React.FC<PersonDetailProps> = ({ personId, onBack }) => {
       address: formData.address?.trim() || undefined,
       email: formData.email?.trim() || undefined,
       blood_group: formData.blood_group || undefined,
-      dixa_date: formData.dixa_date || undefined,
+      is_ambrish: Boolean(formData.is_ambrish),
+      dixa_date: formData.is_ambrish ? (formData.dixa_date || undefined) : undefined,
       avd_code: formData.avd_code?.trim() || undefined,
       aadhar_card_no: formData.aadhar_card_no?.trim() || undefined,
-      anniversary_date: formData.anniversary_date || undefined,
+      marital_status: formData.marital_status || undefined,
+      anniversary_date: formData.marital_status === 'married' && formData.anniversary_date ? formData.anniversary_date : undefined,
       attended_mahotsav: formData.attended_mahotsav?.trim() || undefined,
       education_qualification: formData.education_qualification?.trim() || undefined,
       running_education: formData.running_education?.trim() || undefined,
@@ -300,7 +302,12 @@ const PersonDetail: React.FC<PersonDetailProps> = ({ personId, onBack }) => {
             label="Marital Status"
             placeholder="Select status"
             value={formData.marital_status || ''}
-            onChange={val => set('marital_status', val || undefined)}
+            onChange={val => {
+              set('marital_status', val || undefined);
+              if (val !== 'married') {
+                set('anniversary_date', '');
+              }
+            }}
             options={[
               { value: '', label: 'Select status' },
               { value: 'single', label: 'Single' },
@@ -311,7 +318,12 @@ const PersonDetail: React.FC<PersonDetailProps> = ({ personId, onBack }) => {
         </div>
         {formData.marital_status === 'married' && (
           <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Anniversary Date</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                Anniversary Date
+              </label>
+              <span className="text-[10px] text-gray-400 font-medium">Optional</span>
+            </div>
             <input
               type="date"
               value={formData.anniversary_date || ''}
@@ -344,6 +356,70 @@ const PersonDetail: React.FC<PersonDetailProps> = ({ personId, onBack }) => {
             placeholder="12-digit number"
             maxLength={12}
           />
+        </div>
+
+        {/* Ambrish Selection: Dedicated Radio Field on Personal Tab */}
+        <div className="sm:col-span-2 p-3.5 rounded-xl border border-surface-line bg-paper/60 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-[11px] font-bold text-ink uppercase tracking-wider">
+              Ambrish Status
+            </label>
+            <span className="text-[10px] text-ink-muted">Spiritual designation</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => set('is_ambrish', true)}
+              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                formData.is_ambrish === true
+                  ? 'border-maroon bg-white shadow-sm font-bold text-maroon'
+                  : 'border-surface-line bg-white/70 hover:bg-white text-ink-muted'
+              }`}
+            >
+              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                formData.is_ambrish === true ? 'border-maroon bg-white' : 'border-surface-line'
+              }`}>
+                {formData.is_ambrish === true && <span className="w-2 h-2 rounded-full bg-maroon" />}
+              </span>
+              <span className="text-xs sm:text-sm">★ Yes, Ambrish</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                set('is_ambrish', false);
+                set('dixa_date', '');
+              }}
+              className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                formData.is_ambrish !== true
+                  ? 'border-maroon bg-white shadow-sm font-bold text-ink'
+                  : 'border-surface-line bg-white/70 hover:bg-white text-ink-muted'
+              }`}
+            >
+              <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                formData.is_ambrish !== true ? 'border-maroon bg-white' : 'border-surface-line'
+              }`}>
+                {formData.is_ambrish !== true && <span className="w-2 h-2 rounded-full bg-maroon" />}
+              </span>
+              <span className="text-xs sm:text-sm">No</span>
+            </button>
+          </div>
+
+          {formData.is_ambrish && (
+            <div className="pt-2 border-t border-surface-soft/60">
+              <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                Dixa Date (Optional)
+              </label>
+              <input
+                type="date"
+                value={formData.dixa_date || ''}
+                onChange={e => set('dixa_date', e.target.value)}
+                className="input max-w-xs"
+                placeholder="Select dixa date"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -399,24 +475,50 @@ const PersonDetail: React.FC<PersonDetailProps> = ({ personId, onBack }) => {
 
   const SpiritualTab = (
     <div className="space-y-4">
-      <div className="p-4 rounded-xl border border-surface-200 bg-surface-50">
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-            formData.is_ambrish ? 'bg-primary-600 border-primary-600' : 'border-surface-200 bg-white'
-          }`}>
-            {formData.is_ambrish && <div className="w-2 h-2 bg-white rounded-sm" />}
-          </div>
-          <input
-            type="checkbox"
-            checked={formData.is_ambrish || false}
-            onChange={e => set('is_ambrish', e.target.checked)}
-            className="sr-only"
-          />
-          <div>
-            <p className="text-sm font-semibold text-gray-900">Ambrish</p>
-            <p className="text-xs text-gray-400">Mark if this person is Ambrish</p>
-          </div>
+      <div className="p-4 rounded-xl border border-surface-line bg-paper/60 space-y-2.5">
+        <label className="block text-xs font-bold text-ink uppercase tracking-wider">
+          Ambrish Status
         </label>
+        <p className="text-xs text-ink-muted">Specify whether this member is an Ambrish</p>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => set('is_ambrish', true)}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+              formData.is_ambrish === true
+                ? 'border-maroon bg-white shadow-sm font-bold text-maroon'
+                : 'border-surface-line bg-paper hover:bg-surface-soft text-ink'
+            }`}
+          >
+            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+              formData.is_ambrish === true ? 'border-maroon bg-white' : 'border-surface-line'
+            }`}>
+              {formData.is_ambrish === true && <span className="w-2 h-2 rounded-full bg-maroon" />}
+            </span>
+            <span className="text-xs sm:text-sm">★ Yes, Ambrish</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              set('is_ambrish', false);
+              set('dixa_date', '');
+            }}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+              formData.is_ambrish !== true
+                ? 'border-maroon bg-white shadow-sm font-bold text-ink'
+                : 'border-surface-line bg-paper hover:bg-surface-soft text-ink-muted'
+            }`}
+          >
+            <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+              formData.is_ambrish !== true ? 'border-maroon bg-white' : 'border-surface-line'
+            }`}>
+              {formData.is_ambrish !== true && <span className="w-2 h-2 rounded-full bg-maroon" />}
+            </span>
+            <span className="text-xs sm:text-sm">No</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -6,6 +6,7 @@ import { useData } from '@/context/DataContext';
 import { useAuth } from '@/hooks/useAuth';
 import { exportToExcel } from '@/utils/export';
 import { AttendanceStats } from '@/types';
+import { useAppSettings } from '@/hooks/useAppSettings';
 
 interface DashboardProps {
   onViewChange: (view: string, id?: number) => void;
@@ -45,21 +46,22 @@ function DonutSVG({ segments, size, thickness }: { segments: { count: number; co
   );
 }
 
-function RingProgress({ pct, size = 78 }: { pct: number; size?: number }) {
-  const r = 33; const c = 2 * Math.PI * r;
+function RingProgress({ pct, size = 68 }: { pct: number; size?: number }) {
+  const r = 32;
+  const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox="0 0 78 78" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="39" cy="39" r={r} fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="7" />
-        <circle cx="39" cy="39" r={r} fill="none" stroke="#E39A2D" strokeWidth="7"
+        <circle cx="39" cy="39" r={r} fill="none" stroke="rgba(255,255,255,.16)" strokeWidth="6.5" />
+        <circle cx="39" cy="39" r={r} fill="none" stroke="#E39A2D" strokeWidth="6.5"
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
           style={{ transition: 'stroke-dashoffset .6s ease' }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <b className="font-display font-semibold text-white" style={{ fontSize: 19 }}>{pct}%</b>
-        <span className="text-[8.5px] font-bold" style={{ color: '#E9D3B8' }}>PRESENT</span>
+        <b className="font-display font-bold text-white text-[16px] leading-none">{pct}%</b>
+        <span className="text-[7.5px] font-bold tracking-wider mt-0.5" style={{ color: '#E9D3B8' }}>TURNOUT</span>
       </div>
     </div>
   );
@@ -67,6 +69,7 @@ function RingProgress({ pct, size = 78 }: { pct: number; size?: number }) {
 
 const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) => {
   const { peopleWithDetails, categoriesWithCount, groupsWithCount } = useData();
+  const { settings } = useAppSettings();
   const {
     isAdmin,
     isViewerAdmin,
@@ -86,10 +89,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
       .catch(() => {});
   }, []);
 
-  const upcomingBirthdays = useMemo(() => {
+  const ambrishCount = useMemo(() => {
+    return peopleWithDetails.filter(p => Boolean(p.is_ambrish)).length;
+  }, [peopleWithDetails]);
+
+  const upcomingCelebrations = useMemo(() => {
     const now = new Date();
     const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return peopleWithDetails
+    const windowDays = settings.birthdayWindowDays || 7;
+
+    const bdays = peopleWithDetails
       .filter(p => !!p.dob)
       .map(p => {
         const dobStr = p.dob!.split('T')[0];
@@ -100,11 +109,26 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
         let nextB = new Date(todayDate.getFullYear(), bm, bd);
         if (nextB < todayDate) nextB = new Date(todayDate.getFullYear() + 1, bm, bd);
         const diff = Math.round((nextB.getTime() - todayDate.getTime()) / 86400000);
-        return { person: p, days: diff };
+        return { person: p, days: diff, type: 'birthday' as const };
       })
-      .filter((x): x is { person: typeof peopleWithDetails[0]; days: number } => x !== null && x.days >= 0 && x.days <= 7)
-      .sort((a, b) => a.days - b.days);
-  }, [peopleWithDetails]);
+      .filter((x): x is { person: typeof peopleWithDetails[0]; days: number; type: 'birthday' } => x !== null && x.days >= 0 && x.days <= windowDays);
+
+    const annivs = (settings.trackAnniversaries ? peopleWithDetails : [])
+      .filter(p => p.marital_status === 'married' && !!p.anniversary_date)
+      .map(p => {
+        const parts = p.anniversary_date!.split('T')[0].split('-');
+        if (parts.length < 3) return null;
+        const am = parseInt(parts[1], 10) - 1;
+        const ad = parseInt(parts[2], 10);
+        let nextA = new Date(todayDate.getFullYear(), am, ad);
+        if (nextA < todayDate) nextA = new Date(todayDate.getFullYear() + 1, am, ad);
+        const diff = Math.round((nextA.getTime() - todayDate.getTime()) / 86400000);
+        return { person: p, days: diff, type: 'anniversary' as const };
+      })
+      .filter((x): x is { person: typeof peopleWithDetails[0]; days: number; type: 'anniversary' } => x !== null && x.days >= 0 && x.days <= windowDays);
+
+    return [...bdays, ...annivs].sort((a, b) => a.days - b.days);
+  }, [peopleWithDetails, settings.birthdayWindowDays, settings.trackAnniversaries]);
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
   const rate = attStats?.todayRate ?? 0;
@@ -134,25 +158,37 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
             <span className="text-[11px] font-semibold" style={{ color: '#D9B8A5' }}>{today}</span>
           </div>
 
-          <div className="flex items-center gap-4 mt-3.5 relative z-10">
-            <RingProgress pct={rate} />
-            <div className="flex-1 flex items-center justify-center gap-6 sm:gap-8">
-                <div className="text-center">
-                  <b className="block font-display font-semibold text-white" style={{ fontSize: 20 }}>
-                    {attStats?.todayPresent ?? 0}
-                  </b>
-                  <span className="text-[10px] font-bold tracking-wider" style={{ color: '#E9D3B8' }}>
-                    PRESENT
-                  </span>
-                </div>
-                <div className="text-center">
-                  <b className="block font-display font-semibold text-white" style={{ fontSize: 20 }}>
-                    {peopleWithDetails.length}
-                  </b>
-                  <span className="text-[10px] font-bold tracking-wider" style={{ color: '#E9D3B8' }}>
-                    TOTAL
-                  </span>
-                </div>
+          {/* 3 Metrics: Perfectly balanced equal 3-column layout */}
+          <div className="grid grid-cols-3 items-center gap-1.5 my-3.5 py-3 px-2 rounded-2xl bg-black/20 backdrop-blur-sm border border-white/10 relative z-10">
+            {/* Metric 1: Turnout Rate */}
+            <div className="flex flex-col items-center justify-center text-center">
+              <RingProgress pct={rate} size={64} />
+            </div>
+
+            {/* Metric 2: Present Count */}
+            <div className="flex flex-col items-center justify-center text-center border-x border-white/10 px-1">
+              <span className="text-[10px] font-bold tracking-wider uppercase mb-1" style={{ color: '#F0D9B8' }}>
+                PRESENT
+              </span>
+              <b className="font-display font-bold text-white text-2xl tracking-tight leading-none">
+                {attStats?.todayPresent ?? 0}
+              </b>
+              <span className="text-[10px] font-semibold text-white/60 mt-1">
+                Attended
+              </span>
+            </div>
+
+            {/* Metric 3: Total Count */}
+            <div className="flex flex-col items-center justify-center text-center px-1">
+              <span className="text-[10px] font-bold tracking-wider uppercase mb-1" style={{ color: '#F0D9B8' }}>
+                TOTAL
+              </span>
+              <b className="font-display font-bold text-white text-2xl tracking-tight leading-none">
+                {peopleWithDetails.length}
+              </b>
+              <span className="text-[10px] font-semibold text-white/60 mt-1">
+                Members
+              </span>
             </div>
           </div>
 
@@ -179,6 +215,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
                 <circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16.5 6.2A3.2 3.2 0 0 1 17 12.5"/><path d="M15.5 14.3c2.7.4 4.7 2.6 5 5.7"/>
               </svg>
             </div>
+            {ambrishCount > 0 && (
+              <span className="badge badge-marigold text-[10px]">
+                ★ {ambrishCount} Ambrish
+              </span>
+            )}
           </div>
           <b className="font-display font-semibold text-ink block" style={{ fontSize: 23 }}>{peopleWithDetails.length}</b>
           <span className="text-[11px] font-bold text-ink-muted">PEOPLE</span>
@@ -237,8 +278,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
         </button>
       </div>
 
-      {/* Birthday banner */}
-      {upcomingBirthdays.length > 0 && (
+      {/* Celebration banner */}
+      {upcomingCelebrations.length > 0 && (
         <div
           onClick={onOpenBirthdays}
           className="card p-3.5 mb-2.5 flex items-center gap-3 cursor-pointer transition-all duration-150 active:scale-[0.99] select-none"
@@ -249,18 +290,18 @@ const Dashboard: React.FC<DashboardProps> = ({ onViewChange, onOpenBirthdays }) 
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold truncate" style={{ color: '#7C2D3B' }}>
-              {upcomingBirthdays.filter(x => x.days === 0).length > 0
-                ? `${upcomingBirthdays.filter(x => x.days === 0).map(x => x.person.full_name.split(' ')[0]).join(' & ')} has a birthday today!`
-                : `${upcomingBirthdays.length} birthday${upcomingBirthdays.length > 1 ? 's' : ''} coming up this week`}
+              {upcomingCelebrations.filter(x => x.days === 0).length > 0
+                ? `${upcomingCelebrations.filter(x => x.days === 0).map(x => `${x.person.full_name.split(' ')[0]} (${x.type === 'birthday' ? 'Birthday' : 'Anniversary'})`).join(' & ')} today!`
+                : `${upcomingCelebrations.length} celebration${upcomingCelebrations.length > 1 ? 's' : ''} in the next ${settings.birthdayWindowDays || 7} days`}
             </p>
-            <p className="text-xs text-ink-soft mt-0.5">Tap to view everyone and send wishes</p>
+            <p className="text-xs text-ink-soft mt-0.5">Tap to view birthdays & anniversaries and send wishes</p>
           </div>
           <div className="flex -space-x-2 flex-shrink-0">
-            {upcomingBirthdays.slice(0, 3).map(b => (
+            {upcomingCelebrations.slice(0, 3).map(b => (
               <div
-                key={b.person.person_id}
+                key={`${b.type}-${b.person.person_id}`}
                 className="w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center border-2 border-white text-white shadow-sm"
-                style={{ background: '#7C2D3B' }}
+                style={{ background: b.type === 'birthday' ? '#7C2D3B' : '#C1544A' }}
               >
                 {(b.person.full_name || '?').slice(0, 2).toUpperCase()}
               </div>
